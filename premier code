@@ -1,0 +1,49 @@
+import datetime
+import requests, json
+from requests import Session
+import time
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+url ='https://api3.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
+session=Session()
+i=0
+x=0
+y=1
+L=[]
+Temps=[]
+L3=[]
+for i in range(5):
+    now = datetime.datetime.now()
+    print("il est :" )
+    Temps.append(now.strftime("%H:%M:%S"))
+    print(Temps)
+    print('Et le prix du BTC est:')
+    response=session.get(url)
+    data=json.loads(response.text)
+    L.append(float(data['price']))
+    print(L)
+    y=y+1
+    time.sleep(3)
+Temps = [datetime.datetime.strptime(t, '%H:%M:%S') for t in Temps]
+Temps = [((t.hour * 60 + t.minute) * 60 + t.second) for t in Temps]
+prix_btc = pd.DataFrame({'Prix':L})
+tic_btc = pd.DataFrame({'Tic':Temps})
+prix_btc.to_csv('Prix BTC',sep='\t')
+tic_btc.to_csv('Tic BTC' ,sep='\t')
+L4=[]
+for i in range(len(L)):
+    L3.append((L[i]-L[i-1])/((i+1)-i)+L[i]+(L[i])%10)
+for i in range(len(L3)):
+    L4.append((L3[i]-L3[i-1])/((i+1)-i)+(L3[i])+(L3[i])%10)
+plt.title('Courbe du BTC')
+plt.plot(Temps,L)
+plt.plot(Temps,L3)
+plt.plot(Temps,L4)
+coefs = np.polyfit(Temps, L, 2)
+predictions = np.polyval(coefs, Temps)
+poly_func = np.poly1d(coefs)
+predictions = poly_func(Temps)
+plt.plot(Temps, predictions, color='red')
+plt.show()
