@@ -1,49 +1,95 @@
 import datetime
-import requests, json
+import requests
+import json
 from requests import Session
 import time
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-url ='https://api3.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
-session=Session()
-i=0
-x=0
-y=1
-L=[]
-Temps=[]
-L3=[]
-for i in range(5):
-    now = datetime.datetime.now()
-    print("il est :" )
-    Temps.append(now.strftime("%H:%M:%S"))
-    print(Temps)
-    print('Et le prix du BTC est:')
-    response=session.get(url)
-    data=json.loads(response.text)
+
+def get_btc_price(session, url, L):
+    response = session.get(url)
+    data = json.loads(response.text)
     L.append(float(data['price']))
-    print(L)
-    y=y+1
-    time.sleep(3)
-Temps = [datetime.datetime.strptime(t, '%H:%M:%S') for t in Temps]
-Temps = [((t.hour * 60 + t.minute) * 60 + t.second) for t in Temps]
-prix_btc = pd.DataFrame({'Prix':L})
-tic_btc = pd.DataFrame({'Tic':Temps})
-prix_btc.to_csv('Prix BTC',sep='\t')
-tic_btc.to_csv('Tic BTC' ,sep='\t')
-L4=[]
-for i in range(len(L)):
-    L3.append((L[i]-L[i-1])/((i+1)-i)+L[i]+(L[i])%10)
-for i in range(len(L3)):
-    L4.append((L3[i]-L3[i-1])/((i+1)-i)+(L3[i])+(L3[i])%10)
-plt.title('Courbe du BTC')
-plt.plot(Temps,L)
-plt.plot(Temps,L3)
-plt.plot(Temps,L4)
-coefs = np.polyfit(Temps, L, 2)
-predictions = np.polyval(coefs, Temps)
-poly_func = np.poly1d(coefs)
-predictions = poly_func(Temps)
-plt.plot(Temps, predictions, color='red')
-plt.show()
+
+
+def get_current_time():
+    now = datetime.datetime.now()
+    return now.strftime("%H:%M:%S")
+
+
+def get_time_in_seconds(Temps):
+    return [((t.hour * 60 + t.minute) * 60 + t.second) for t in Temps]
+
+
+def calculate_btc_prices(L):
+    L3 = []
+    for i in range(len(L)):
+        L3.append((L[i] - L[i - 1]) / ((i + 1) - i) + L[i] + (L[i])%15)
+    L4 = []
+    for i in range(len(L3)):
+        L4.append((L3[i] - L3[i - 1]) / ((i + 1) - i) + (L3[i]) + (L3[i]) %1)
+    return L3, L4
+
+
+def plot_btc_prices(Temps, L, L3, L4):
+    plt.title('Courbe du BTC')
+    plt.plot(Temps, L)
+    plt.plot(Temps, L3)
+    plt.plot(Temps, L4)
+    coefs = np.polyfit(Temps, L, 2)
+    predictions = np.polyval(coefs, Temps)
+    poly_func = np.poly1d(coefs)
+    predictions = poly_func(Temps)
+    plt.plot(Temps, predictions, color='red')
+    plt.show()
+
+
+def moyenne_prix_entre_temps(debut, fin, df):
+    debut_dt = datetime.datetime.strptime(debut, '%H:%M:%S')
+    fin_dt = datetime.datetime.strptime(fin, '%H:%M:%S')
+    debut_sec = (debut_dt - datetime.datetime(1900, 1, 1)).total_seconds()
+    fin_sec = (fin_dt - datetime.datetime(1900, 1, 1)).total_seconds()
+    df_selection = df.loc[(df['Temps'] >= debut_sec) & (df['Temps'] <= fin_sec)]
+    moyenne_prix = df_selection['Prix'].mean()
+    return moyenne_prix
+
+def calculer_quantite(moyenne_mobile, cours_actuel):
+    if cours_actuel > moyenne_mobile:
+        return 0.1
+    else:
+        return -0.1
+
+def main():
+    url = 'https://api3.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
+    session = Session()
+    L = []
+    Temps = []
+    for i in range(10):
+        current_time = get_current_time()
+        print("il est :", current_time)
+        Temps.append(datetime.datetime.strptime(current_time, '%H:%M:%S'))
+        print('Et le prix du BTC est:')
+        get_btc_price(session, url, L)
+        print(L)
+        time.sleep(3)
+
+    Temps_in_seconds = get_time_in_seconds(Temps)
+    L3, L4 = calculate_btc_prices(L)
+
+    prix_btc = pd.DataFrame({'Prix': L, 'Temps': Temps_in_seconds})
+    prix_btc.to_csv('Prix BTC + Heure', sep='\t')
+
+    plot_btc_prices(Temps_in_seconds, L, L3, L4)
+    
+    debut = '12:57:00'
+    fin = '12:59:00'
+    moyenne_entre_temps = moyenne_prix_entre_temps(debut, fin, prix_btc)
+    print(f"La moyenne des prix entre {debut} et {fin} est {moyenne_entre_temps}")
+    moyenne_mobile = moyenne_prix_entre_temps(debut, fin, prix_btc)
+    quantite = calculer_quantite(moyenne_mobile, L[-1])
+    print("Quantité à acheter ou vendre:", quantite)
+
+if __name__ == '__main__':
+    main()
