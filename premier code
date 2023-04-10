@@ -25,19 +25,19 @@ def get_time_in_seconds(Temps):
 
 def calculate_btc_prices(L):
     L3 = []
-    for i in range(len(L)):
-        L3.append((L[i] - L[i - 1]) / ((i + 1) - i) + L[i] + (L[i])%15)
+    for i in range(1, len(L)):
+        L3.append((L[i] - L[i - 1]) / ((i + 1) - i) + L[i] + (L[i]) % 15)
     L4 = []
-    for i in range(len(L3)):
-        L4.append((L3[i] - L3[i - 1]) / ((i + 1) - i) + (L3[i]) + (L3[i]) %1)
+    for i in range(1, len(L3)):
+        L4.append((L3[i] - L3[i - 1]) / ((i + 1) - i) + (L3[i]) + (L3[i]) % 1)
     return L3, L4
 
 
 def plot_btc_prices(Temps, L, L3, L4):
     plt.title('Courbe du BTC')
     plt.plot(Temps, L)
-    plt.plot(Temps, L3)
-    plt.plot(Temps, L4)
+    plt.plot(Temps[1:], L3)
+    plt.plot(Temps[2:], L4)
     coefs = np.polyfit(Temps, L, 2)
     predictions = np.polyval(coefs, Temps)
     poly_func = np.poly1d(coefs)
@@ -55,11 +55,17 @@ def moyenne_prix_entre_temps(debut, fin, df):
     moyenne_prix = df_selection['Prix'].mean()
     return moyenne_prix
 
-def calculer_quantite(moyenne_mobile, cours_actuel):
-    if cours_actuel > moyenne_mobile:
-        return 0.1
+
+def decider_achat_vente(prix_btc, moyenne_entre_temps, periode_courte=10, periode_longue=30):
+    moyenne_mobile_courte = prix_btc['Prix'].rolling(window=periode_courte).mean()
+    moyenne_mobile_longue = prix_btc['Prix'].rolling(window=periode_longue).mean()
+    if moyenne_mobile_courte.iloc[-1] > moyenne_mobile_longue.iloc[-1] and prix_btc['Prix'].iloc[-1] < moyenne_entre_temps:
+        return abs(1)
+    elif moyenne_mobile_courte.iloc[-1] < moyenne_mobile_longue.iloc[-1] and prix_btc['Prix'].iloc[-1] > moyenne_entre_temps:
+        return abs(-1)
     else:
-        return -0.1
+        return 0
+
 
 def main():
     url = 'https://api3.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
@@ -83,13 +89,17 @@ def main():
 
     plot_btc_prices(Temps_in_seconds, L, L3, L4)
     
-    debut = '12:57:00'
-    fin = '12:59:00'
+    debut = '00:00:00'
+    fin = '23:00:00'
     moyenne_entre_temps = moyenne_prix_entre_temps(debut, fin, prix_btc)
     print(f"La moyenne des prix entre {debut} et {fin} est {moyenne_entre_temps}")
-    moyenne_mobile = moyenne_prix_entre_temps(debut, fin, prix_btc)
-    quantite = calculer_quantite(moyenne_mobile, L[-1])
-    print("Quantité à acheter ou vendre:", quantite)
+    quantite = decider_achat_vente(prix_btc, moyenne_entre_temps)
+    if quantite > 0:
+        print(f"Je vous conseille d'acheter {quantite:.3f} BTC.")
+    elif quantite < 0:
+        print(f"Je vous conseille de vendre {abs(quantite):.3f} BTC.")
+    else:
+        print("Je ne vous conseille ni d'acheter ni de vendre pour le moment.")
 
 if __name__ == '__main__':
     main()
