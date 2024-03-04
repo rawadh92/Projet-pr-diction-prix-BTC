@@ -1,1 +1,1 @@
-# Projet prediction BTC prices
+# Project prediction BTC prices
